@@ -1,0 +1,86 @@
+name: dashboard-build
+on:
+  push:
+    branches:
+      - 'master'
+    tags:
+      - "dev/**"
+      - "uat/**"
+      - "prod/**"
+  pull_request:
+    branches:
+      - 'master'
+  workflow_dispatch:
+    inputs:
+      candidate:
+        type: choice
+        description: Select Build Purpose
+        options:
+        - Normal
+        - Release Candidate
+  create:
+    tags:
+      - "dev/**"
+      - "uat/**"
+      - "prod/**" 
+   
+jobs:
+  cleanup:
+    runs-on: [self-hosted, linux, APPE]
+    container:
+      image: ubuntu:latest
+    steps:
+      - name: Cleaning up the $GITHUB_WORKSPACE as root from a Docker image
+        # Volume auto mounted by gh actions pointing to the current working-directory
+        run: find /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}/. -name . -o -prune -exec rm -rf -- {} + || true
+          
+  build-submission-dashboard:
+    name: Build Submission dashboard
+    runs-on:  [self-hosted, linux, APPE]
+    strategy:
+      matrix:
+        node-version: [8.x]
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Node Js version as ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Login to GitHub private NPM registry
+        env:
+          CI_ACCESS_TOKEN: ${{ secrets.PAT_TOKEN_SUBMISSION }}
+          NPM_EMAIL: ${{ secrets.NPM_EMAIL }}
+          NPM_USER: ${{ secrets.NPM_USER }}
+          NPM_SCOPE: ${{ secrets.NPM_SCOPE }}
+          NPM_REGISTRY: ${{ secrets.NPM_REGISTRY }}
+        shell: bash
+        run: |
+          npm install -g npm-cli-login
+          npm-cli-login -u "${NPM_USER}" -p "${CI_ACCESS_TOKEN}" -e "${NPM_EMAIL}" -r "https://npm.pkg.github.com" -s "${NPM_SCOPE}"
+
+      - name: Install The Dependencies
+        run: npm install
+
+      - name: run unit tests  
+        run: npm run test-coverage
+
+      - name: Sonar cloud analysis 
+        run: |
+          docker run --rm -v ${PWD}:/usr/src sonarsource/sonar-scanner-cli
+          sudo chmod 777 -R /home/ubuntu/actions-runner/_work/submission-dashboard
+      - name: Build Notification
+        if: always()
+        uses: adamkdean/simple-slack-notify@master
+        with:
+          status: ${{ job.status }}
+          success_text: '${env.GITHUB_WORKFLOW} - #${env.GITHUB_RUN_NUMBER} build successfully by ${env.GITHUB_ACTOR}'
+          failure_text: '${env.GITHUB_WORKFLOW} - #${env.GITHUB_RUN_NUMBER} build failed by ${env.GITHUB_ACTOR}'
+          cancelled_text: '${env.GITHUB_WORKFLOW} - #${env.GITHUB_RUN_NUMBER} build was cancelled  by ${env.GITHUB_ACTOR}'
+          fields: |
+            [{ "title": "Repository", "value": "${env.GITHUB_REPOSITORY}", "short": true },
+             { "title": "Branch", "value": "${env.GITHUB_REF}", "short": true },
+             { "title": "Event", "value": "${env.GITHUB_EVENT_NAME}", "short": true },
+             { "title": "Commit", "value": "${env.GITHUB_SHA}", "short": true }]
