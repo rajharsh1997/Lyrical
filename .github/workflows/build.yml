@@ -16,8 +16,8 @@ on:
         type: choice
         description: Select Build Purpose
         options:
-        - Normal
-        - Release Candidate
+        - yes
+        - no
   create:
     tags:
       - "dev/**"
