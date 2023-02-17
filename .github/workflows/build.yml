@@ -16,8 +16,8 @@ on:
         type: choice
         description: Select Build Purpose
         options:
-        - yes
-        - no
+        - true
+        - false
   create:
     tags:
       - "dev/**"
@@ -49,18 +49,15 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Login to GitHub private NPM registry
-        env:
-          CI_ACCESS_TOKEN: ${{ secrets.PAT_TOKEN_SUBMISSION }}
-          NPM_EMAIL: ${{ secrets.NPM_EMAIL }}
-          NPM_USER: ${{ secrets.NPM_USER }}
-          NPM_SCOPE: ${{ secrets.NPM_SCOPE }}
-          NPM_REGISTRY: ${{ secrets.NPM_REGISTRY }}
-        shell: bash
-        run: |
-          npm install -g npm-cli-login
-          npm-cli-login -u "${NPM_USER}" -p "${CI_ACCESS_TOKEN}" -e "${NPM_EMAIL}" -r "https://npm.pkg.github.com" -s "${NPM_SCOPE}"
+      - name: Build and push in ECR
+        if: ${{ github.event.inputs.choice == 'false'}}
+        run:
+          echo "false"
 
+      - name: Build and deploy in Dev
+        if: ${{ github.event.inputs.choice == 'true'}}
+        run: |
+          echo "true"
       - name: Install The Dependencies
         run: npm install
 
