@@ -17,7 +17,7 @@ on:
    
 jobs:          
   build-random:
-    name: Build lo
+    name: Build to ${{github.event.inputs.environment}}
     runs-on:  ubuntu-latest
     environment: ${{github.event.inputs.environment}}
     env:
