@@ -18,7 +18,7 @@ on:
 jobs:          
   build-random:
     name: Build lo
-    runs-on:  [self-hosted, linux, APPE]
+    runs-on:  ubuntu-latest
     environment: ${{github.event.inputs.environment}}
     env:
       RESOLVED_NODE_ENV: ''
